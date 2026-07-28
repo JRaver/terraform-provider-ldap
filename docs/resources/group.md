@@ -1,3 +1,10 @@
+---
+subcategory: ""
+page_title: "ldap_group Resource - terraform-provider-ldap"
+description: |-
+  ldap_group is a resource for managing an LDAP group.
+---
+
 # ldap_group
 
 `ldap_group` is a resource for managing an LDAP group.
@@ -15,18 +22,18 @@ resource "ldap_group" "group" {
 
 ## Argument Reference
 
-* `ou` - (Required) OU where LDAP group will be created.
-* `name` - (Required) LDAP group name.
-* `members` - (Optional) LDAP group members. Defaults to `[]`.
-* `description` - (Optional) Description attribute for the LDAP group. Defaults to empty.
-* `group_type` - (Optional, Computed) Type of the group.
-* `managed_by` - (Optional) ManagedBy attribute. Defaults to ``.
-* `display_name` - (Optional) The displayName of the group. Defaults to ``.
+* `ou` - (Required) OU where the LDAP group will be created. Changes force recreation.
+* `name` - (Required) LDAP group name (CN). Changes force recreation.
+* `description` - (Optional) Description attribute for the LDAP group.
+* `members` - (Optional, Computed) List of full DNs of LDAP objects that are members of this group. When set, **replaces all existing members**. To manage members without full replacement, use `ldap_group_member` resources instead and omit this field.
+* `group_type` - (Optional, Computed) The groupType attribute value (e.g. `-2147483646` for a global security group in Active Directory). Changes force recreation.
+* `managed_by` - (Optional) The DN of the object that manages this group (managedBy LDAP attribute).
+* `display_name` - (Optional) The displayName attribute of the group.
 
 ## Attribute Reference
 
-* `members_names` - Names of the members
-* `id` - The DN of the LDAP group.
+* `id` - The full DN of the LDAP group.
+* `members_names` - Display names (CN values) of the current group members. Computed automatically.
 
 ## Import
 

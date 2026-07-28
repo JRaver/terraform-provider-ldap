@@ -31,18 +31,18 @@ func dataSourceLDAPOU() *schema.Resource {
 				Required:    true,
 			},
 			"scope": {
-				Description: "LDAP search scope",
+				Description: "LDAP search scope: 0 = BaseObject, 1 = SingleLevel, 2 = WholeSubtree. Defaults to 0.",
 				Type:        schema.TypeInt,
 				Optional:    true,
 				Default:     0,
 			},
 			"description": {
-				Description: "Description attribute for the LDAP OU",
+				Description: "Description attribute of the LDAP OU.",
 				Type:        schema.TypeString,
 				Computed:    true,
 			},
 			"managed_by": {
-				Description: "ManagedBy attribute",
+				Description: "The DN of the object that manages this OU (managedBy LDAP attribute).",
 				Type:        schema.TypeString,
 				Computed:    true,
 			},

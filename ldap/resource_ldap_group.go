@@ -46,7 +46,7 @@ func resourceLDAPGroup() *schema.Resource {
 				Optional:    true,
 			},
 			"members": {
-				Description: " LDAP group members DN",
+				Description: "List of full DNs of LDAP objects that are members of this group. When set, replaces all existing members. Omit this field to manage members via `ldap_group_member` resources.",
 				Type:        schema.TypeSet,
 				Optional:    true,
 				Computed:    true,
@@ -55,7 +55,7 @@ func resourceLDAPGroup() *schema.Resource {
 				},
 			},
 			"members_names": {
-				Description: "LDAP group members names.",
+				Description: "Display names (CN values) of the current group members. Computed automatically.",
 				Type:        schema.TypeSet,
 				Computed:    true,
 				Elem: &schema.Schema{
@@ -63,20 +63,20 @@ func resourceLDAPGroup() *schema.Resource {
 				},
 			},
 			"group_type": {
-				Description: "Type of the group",
+				Description: "The groupType attribute value (e.g. -2147483646 for a global security group in Active Directory).",
 				Type:        schema.TypeString,
 				Optional:    true,
 				Computed:    true,
 				ForceNew:    true,
 			},
 			"managed_by": {
-				Description: "ManagedBy attribute",
+				Description: "The DN of the object that manages this group (managedBy LDAP attribute).",
 				Type:        schema.TypeString,
 				Optional:    true,
 				Default:     "",
 			},
 			"display_name": {
-				Description: "The displayName of the group",
+				Description: "The displayName attribute of the group.",
 				Type:        schema.TypeString,
 				Optional:    true,
 				Default:     "",
