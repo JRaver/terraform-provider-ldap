@@ -46,7 +46,7 @@ func resourceLDAPOU() *schema.Resource {
 				Optional:    true,
 			},
 			"managed_by": {
-				Description: "ManagedBy attribute",
+				Description: "The DN of the object that manages this OU (managedBy LDAP attribute).",
 				Type:        schema.TypeString,
 				Optional:    true,
 				Default:     "",

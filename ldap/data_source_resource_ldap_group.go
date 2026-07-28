@@ -31,18 +31,18 @@ func dataSourceLDAPGroup() *schema.Resource {
 				Required:    true,
 			},
 			"scope": {
-				Description: "LDAP search scope",
+				Description: "LDAP search scope: 0 = BaseObject, 1 = SingleLevel, 2 = WholeSubtree. Defaults to 0.",
 				Type:        schema.TypeInt,
 				Optional:    true,
 				Default:     0,
 			},
 			"description": {
-				Description: "Description attribute for the LDAP",
+				Description: "Description attribute of the LDAP group.",
 				Type:        schema.TypeString,
 				Computed:    true,
 			},
 			"members": {
-				Description: "LDAP DN of group members DN",
+				Description: "List of full DNs of the group members.",
 				Type:        schema.TypeSet,
 				Computed:    true,
 				Elem: &schema.Schema{
@@ -58,17 +58,17 @@ func dataSourceLDAPGroup() *schema.Resource {
 				},
 			},
 			"group_type": {
-				Description: "Type of the group",
+				Description: "The groupType attribute value of the LDAP group.",
 				Type:        schema.TypeString,
 				Computed:    true,
 			},
 			"managed_by": {
-				Description: "ManagedBy attribute",
+				Description: "The DN of the object that manages this group (managedBy LDAP attribute).",
 				Type:        schema.TypeString,
 				Computed:    true,
 			},
 			"display_name": {
-				Description: "The displayName of the group",
+				Description: "The displayName attribute of the group.",
 				Type:        schema.TypeString,
 				Computed:    true,
 			},

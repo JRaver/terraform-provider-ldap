@@ -1,3 +1,10 @@
+---
+subcategory: ""
+page_title: "ldap_ou Resource - terraform-provider-ldap"
+description: |-
+  ldap_ou is a resource for managing an LDAP OU.
+---
+
 # ldap_ou
 
 `ldap_ou` is a resource for managing an LDAP OU.
@@ -14,14 +21,14 @@ resource "ldap_ou" "ou" {
 
 ## Argument Reference
 
-* `ou` - (Required) OU where LDAP OU will be created.
-* `name` - (Required) LDAP OU name.
-* `description` - (Optional) Description attribute for the LDAP OU. Defaults to empty.
-* `managed_by` - (Optional) ManagedBy attribute. Defaults to ``.
+* `ou` - (Required) OU where the LDAP OU will be created. Changes force recreation.
+* `name` - (Required) LDAP OU name. Changes force recreation.
+* `description` - (Optional) Description attribute for the LDAP OU.
+* `managed_by` - (Optional) The DN of the object that manages this OU (managedBy LDAP attribute).
 
 ## Attribute Reference
 
-* `id` - The DN of the LDAP OU.
+* `id` - The full DN of the LDAP OU.
 
 ## Import
 

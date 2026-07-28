@@ -37,7 +37,7 @@ func dataSourceLDAPUser() *schema.Resource {
 				AtLeastOneOf: []string{"name", "sam_account_name", "user_principal_name"},
 			},
 			"user_principal_name": {
-				Description:  "The userPrincipalName of the LDAP user",
+				Description:  "The userPrincipalName (UPN) of the LDAP user.",
 				Type:         schema.TypeString,
 				Optional:     true,
 				AtLeastOneOf: []string{"name", "sam_account_name", "user_principal_name"},
