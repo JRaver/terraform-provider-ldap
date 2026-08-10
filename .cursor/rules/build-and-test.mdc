@@ -1,0 +1,96 @@
+---
+description: Як зібрати та локально протестувати terraform-provider-ldap
+alwaysApply: false
+globs: "**/*.go,*.tf,*.tfvars"
+---
+
+# Збірка та тестування terraform-provider-ldap
+
+## Збірка бінарника
+
+```bash
+go build -o terraform-provider-ldap .
+```
+
+Бінарник з'являється у корені репо.
+
+## Локальна установка через dev_overrides
+
+### 1. `~/.terraformrc` — додати один раз
+
+```hcl
+provider_installation {
+  dev_overrides {
+    "JRaver/ldap" = "/Users/eartemenko/git_repos/github/JRaver/terraform-provider-ldap"
+  }
+  direct {}
+}
+```
+
+> Terraform читає бінарник `terraform-provider-ldap` напряму з вказаного каталогу.  
+> `terraform init` **не потрібен** при `dev_overrides`.
+
+### 2. Тестова конфігурація `test/main.tf`
+
+```hcl
+terraform {
+  required_providers {
+    ldap = {
+      source = "JRaver/ldap"
+    }
+  }
+}
+
+provider "ldap" {
+  host          = "ldap.example.com"
+  port          = 389          # або 636 для TLS
+  bind_user     = "CN=svc-terraform,OU=Service,DC=example,DC=com"
+  bind_password = var.ldap_password
+  tls           = false        # true для LDAPS
+}
+
+# Тест ldap_user
+resource "ldap_user" "test" {
+  ou                  = "OU=Test,DC=example,DC=com"
+  name                = "Test User"
+  sam_account_name    = "test.user"
+  user_principal_name = "test.user@example.com"
+  display_name        = "Test User"
+  enabled             = true
+}
+
+# Тест ldap_group з display_name та managed_by
+resource "ldap_group" "test" {
+  ou           = "OU=Groups,DC=example,DC=com"
+  name         = "TestGroup"
+  description  = "Terraform test group"
+  display_name = "Test Group"
+}
+```
+
+### 3. Цикл розробки
+
+```bash
+# Зібрати + запустити план
+go build -o terraform-provider-ldap . && terraform -chdir=test plan
+
+# Застосувати
+terraform -chdir=test apply
+
+# Очистити
+terraform -chdir=test destroy
+```
+
+## Важливо про паролі (`ldap_user.password`)
+
+- Потребує **TLS/LDAPS** (port 636): `tls = true` у провайдері
+- AD кодує пароль через `unicodePwd` як UTF-16LE
+- При plain LDAP (389) операція завершиться помилкою `unwilling to perform`
+- Поле `Sensitive = true` — не логується у стані
+
+## Import існуючого user/group
+
+```bash
+terraform import ldap_user.example "CN=John Doe,OU=Users,DC=example,DC=com"
+terraform import ldap_group.example "CN=MyGroup,OU=Groups,DC=example,DC=com"
+```
