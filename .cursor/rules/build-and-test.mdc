@@ -1,22 +1,63 @@
 ---
-description: Як зібрати та локально протестувати terraform-provider-ldap
+description: How to build, lint, test and locally test terraform-provider-ldap
 alwaysApply: false
 globs: "**/*.go,*.tf,*.tfvars"
 ---
 
-# Збірка та тестування terraform-provider-ldap
+# Build, Lint & Test — terraform-provider-ldap
 
-## Збірка бінарника
+## Build binary
 
 ```bash
 go build -o terraform-provider-ldap .
 ```
 
-Бінарник з'являється у корені репо.
+The binary is placed in the repo root.
 
-## Локальна установка через dev_overrides
+## Lint
 
-### 1. `~/.terraformrc` — додати один раз
+Always run the linter after making changes to Go files:
+
+```bash
+golangci-lint run ./...
+```
+
+Key rules enforced:
+- `errcheck` — every `d.Set(...)` return value must be checked
+- `go vet` — standard static analysis
+
+Fix pattern for `d.Set`:
+```go
+// Wrong — lint will fail
+d.Set("field", value)
+
+// Correct
+if err := d.Set("field", value); err != nil {
+    return diag.FromErr(err)
+}
+```
+
+In import functions (`StateContext`) where the return type is `([]*schema.ResourceData, error)`:
+```go
+if err := d.Set("field", value); err != nil {
+    return nil, err
+}
+```
+
+## Unit tests
+
+```bash
+go test ./ldap/ -v
+```
+
+Run a specific test:
+```bash
+go test ./ldap/ -run TestParseResource -v
+```
+
+## Local install via dev_overrides
+
+### 1. `~/.terraformrc` — add once
 
 ```hcl
 provider_installation {
@@ -27,70 +68,26 @@ provider_installation {
 }
 ```
 
-> Terraform читає бінарник `terraform-provider-ldap` напряму з вказаного каталогу.  
-> `terraform init` **не потрібен** при `dev_overrides`.
+> Terraform reads the binary directly from the directory above.
+> `terraform init` is **not needed** with `dev_overrides`.
 
-### 2. Тестова конфігурація `test/main.tf`
-
-```hcl
-terraform {
-  required_providers {
-    ldap = {
-      source = "JRaver/ldap"
-    }
-  }
-}
-
-provider "ldap" {
-  host          = "ldap.example.com"
-  port          = 389          # або 636 для TLS
-  bind_user     = "CN=svc-terraform,OU=Service,DC=example,DC=com"
-  bind_password = var.ldap_password
-  tls           = false        # true для LDAPS
-}
-
-# Тест ldap_user
-resource "ldap_user" "test" {
-  ou                  = "OU=Test,DC=example,DC=com"
-  name                = "Test User"
-  sam_account_name    = "test.user"
-  user_principal_name = "test.user@example.com"
-  display_name        = "Test User"
-  enabled             = true
-}
-
-# Тест ldap_group з display_name та managed_by
-resource "ldap_group" "test" {
-  ou           = "OU=Groups,DC=example,DC=com"
-  name         = "TestGroup"
-  description  = "Terraform test group"
-  display_name = "Test Group"
-}
-```
-
-### 3. Цикл розробки
+### 2. Development cycle
 
 ```bash
-# Зібрати + запустити план
+# Build + plan
 go build -o terraform-provider-ldap . && terraform -chdir=test plan
 
-# Застосувати
+# Apply
 terraform -chdir=test apply
 
-# Очистити
+# Destroy
 terraform -chdir=test destroy
 ```
 
-## Важливо про паролі (`ldap_user.password`)
-
-- Потребує **TLS/LDAPS** (port 636): `tls = true` у провайдері
-- AD кодує пароль через `unicodePwd` як UTF-16LE
-- При plain LDAP (389) операція завершиться помилкою `unwilling to perform`
-- Поле `Sensitive = true` — не логується у стані
-
-## Import існуючого user/group
+## Import existing resources
 
 ```bash
-terraform import ldap_user.example "CN=John Doe,OU=Users,DC=example,DC=com"
 terraform import ldap_group.example "CN=MyGroup,OU=Groups,DC=example,DC=com"
+terraform import ldap_group_member.example "CN=MyGroup,OU=Groups,DC=example,DC=com/CN=John Doe,OU=Users,DC=example,DC=com"
+terraform import ldap_group_attribute.example "CN=MyGroup,OU=Groups,DC=example,DC=com/department"
 ```
