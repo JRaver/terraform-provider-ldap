@@ -14,7 +14,7 @@ The LDAP provider is used to interact with an Active Directory or LDAP server.
 terraform {
   required_providers {
     ldap = {
-      source = "Ouest-France/ldap"
+      source = "JRaver/ldap"
     }
   }
 }
