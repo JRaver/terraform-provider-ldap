@@ -191,8 +191,12 @@ func resourceLDAPGroupAttributeImport(ctx context.Context, d *schema.ResourceDat
 		return nil, err
 	}
 
-	d.Set("group_dn", groupDN)
-	d.Set("attribute_name", attrName)
+	if err := d.Set("group_dn", groupDN); err != nil {
+		return nil, err
+	}
+	if err := d.Set("attribute_name", attrName); err != nil {
+		return nil, err
+	}
 
 	return []*schema.ResourceData{d}, nil
 }
