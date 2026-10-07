@@ -137,11 +137,36 @@ func resourceLDAPGroupAttributeRead(ctx context.Context, d *schema.ResourceData,
 	if err := d.Set("attribute_name", attrName); err != nil {
 		return diag.FromErr(err)
 	}
-	if err := d.Set("attribute_values", foundValues); err != nil {
+	// LDAP multi-valued attributes are unordered; keep the prior order to avoid spurious diffs.
+	priorValues := expandStringList(d.Get("attribute_values").([]interface{}))
+	if err := d.Set("attribute_values", orderLike(foundValues, priorValues)); err != nil {
 		return diag.FromErr(err)
 	}
 
 	return nil
+}
+
+// orderLike returns prior if actual contains the same values (case-insensitive, as AD compares them),
+// otherwise returns actual unchanged.
+func orderLike(actual, prior []string) []string {
+	if len(actual) != len(prior) {
+		return actual
+	}
+	used := make([]bool, len(actual))
+	for _, want := range prior {
+		found := false
+		for i, got := range actual {
+			if !used[i] && strings.EqualFold(got, want) {
+				used[i] = true
+				found = true
+				break
+			}
+		}
+		if !found {
+			return actual
+		}
+	}
+	return prior
 }
 
 func resourceLDAPGroupAttributeUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {

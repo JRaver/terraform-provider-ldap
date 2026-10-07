@@ -1,6 +1,10 @@
 package ldap
 
 import (
+	"fmt"
+	"math/rand/v2"
+	"slices"
+	"strings"
 	"testing"
 )
 
@@ -120,6 +124,225 @@ func TestExpandStringList(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// ── orderLike ────────────────────────────────────────────────────────────────
+
+func TestOrderLike(t *testing.T) {
+	tests := []struct {
+		name   string
+		actual []string
+		prior  []string
+		want   []string
+	}{
+		{
+			name:   "same set, different order returns prior",
+			actual: []string{"ccc", "aaa", "bbb"},
+			prior:  []string{"aaa", "bbb", "ccc"},
+			want:   []string{"aaa", "bbb", "ccc"},
+		},
+		{
+			name:   "case-only difference returns prior",
+			actual: []string{"mixeduser", "CN=Bob,DC=example,DC=com"},
+			prior:  []string{"cn=bob,dc=example,dc=com", "MixedUser"},
+			want:   []string{"cn=bob,dc=example,dc=com", "MixedUser"},
+		},
+		{
+			name:   "mixed-case value in AD order returns prior",
+			actual: []string{"user03@example.com", "user02@example.com", "MixedUser@example.com", "user01@example.com"},
+			prior:  []string{"MixedUser@example.com", "user01@example.com", "user02@example.com", "user03@example.com"},
+			want:   []string{"MixedUser@example.com", "user01@example.com", "user02@example.com", "user03@example.com"},
+		},
+		{
+			name:   "AD returns different casing returns prior with config casing",
+			actual: []string{"user01@example.com", "mixeduser@EXAMPLE.COM"},
+			prior:  []string{"MixedUser@example.com", "user01@example.com"},
+			want:   []string{"MixedUser@example.com", "user01@example.com"},
+		},
+		{
+			name:   "all upper case in AD returns prior",
+			actual: []string{"USER01@EXAMPLE.COM", "MIXEDUSER@EXAMPLE.COM"},
+			prior:  []string{"MixedUser@example.com", "user01@example.com"},
+			want:   []string{"MixedUser@example.com", "user01@example.com"},
+		},
+		{
+			name:   "case-insensitive duplicates are matched one-to-one",
+			actual: []string{"mixeduser@example.com", "MIXEDUSER@example.com"},
+			prior:  []string{"MixedUser@example.com", "MixedUser@example.com"},
+			want:   []string{"MixedUser@example.com", "MixedUser@example.com"},
+		},
+		{
+			name:   "mixed-case value replaced returns actual",
+			actual: []string{"user01@example.com", "MixedUsex@example.com"},
+			prior:  []string{"MixedUser@example.com", "user01@example.com"},
+			want:   []string{"user01@example.com", "MixedUsex@example.com"},
+		},
+		{
+			name:   "mixed-case value removed returns actual",
+			actual: []string{"user01@example.com", "user02@example.com"},
+			prior:  []string{"MixedUser@example.com", "user01@example.com"},
+			want:   []string{"user01@example.com", "user02@example.com"},
+		},
+		{
+			name:   "value replaced returns actual",
+			actual: []string{"aaa", "ddd", "ccc"},
+			prior:  []string{"aaa", "bbb", "ccc"},
+			want:   []string{"aaa", "ddd", "ccc"},
+		},
+		{
+			name:   "value added returns actual",
+			actual: []string{"aaa", "bbb", "ccc"},
+			prior:  []string{"bbb", "aaa"},
+			want:   []string{"aaa", "bbb", "ccc"},
+		},
+		{
+			name:   "value removed returns actual",
+			actual: []string{"bbb"},
+			prior:  []string{"aaa", "bbb"},
+			want:   []string{"bbb"},
+		},
+		{
+			name:   "duplicates are matched one-to-one",
+			actual: []string{"aaa", "bbb"},
+			prior:  []string{"aaa", "aaa"},
+			want:   []string{"aaa", "bbb"},
+		},
+		{
+			name:   "empty prior (import) returns actual",
+			actual: []string{"bbb", "aaa"},
+			prior:  []string{},
+			want:   []string{"bbb", "aaa"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := orderLike(tt.actual, tt.prior)
+			if len(got) != len(tt.want) {
+				t.Fatalf("length mismatch: got %v, want %v", got, tt.want)
+			}
+			for i := range tt.want {
+				if got[i] != tt.want[i] {
+					t.Errorf("index %d: got %q, want %q (full: %v)", i, got[i], tt.want[i], got)
+				}
+			}
+		})
+	}
+}
+
+const largeOwnersCount = 59
+
+// largeOwnersFixture returns a sorted config-style list with one mixed-case value first,
+// and the same set shuffled deterministically to mimic AD's internal order.
+func largeOwnersFixture() (configOrder, adOrder []string) {
+	configOrder = []string{"MixedUser@example.com"}
+	for i := 1; i < largeOwnersCount; i++ {
+		configOrder = append(configOrder, fmt.Sprintf("user%02d@example.com", i))
+	}
+	// 7 is coprime with 59, so i -> (7i+3) mod 59 is a permutation.
+	adOrder = make([]string, largeOwnersCount)
+	for i := range adOrder {
+		adOrder[i] = configOrder[(7*i+3)%largeOwnersCount]
+	}
+	return configOrder, adOrder
+}
+
+func TestOrderLike_LargeOwnersList(t *testing.T) {
+	configOrder, adOrder := largeOwnersFixture()
+
+	mixedIdx := -1
+	for i, v := range adOrder {
+		if v == "MixedUser@example.com" {
+			mixedIdx = i
+		}
+	}
+	if mixedIdx <= 0 {
+		t.Fatalf("fixture: mixed-case value should be shuffled away from index 0, got %d", mixedIdx)
+	}
+
+	assertEqual := func(t *testing.T, got, want []string) {
+		t.Helper()
+		if len(got) != len(want) {
+			t.Fatalf("length mismatch: got %d, want %d", len(got), len(want))
+		}
+		for i := range want {
+			if got[i] != want[i] {
+				t.Fatalf("index %d: got %q, want %q", i, got[i], want[i])
+			}
+		}
+	}
+
+	t.Run("same set in AD order returns config order", func(t *testing.T) {
+		assertEqual(t, orderLike(adOrder, configOrder), configOrder)
+	})
+
+	t.Run("AD lower-cases mixed-case value returns config order", func(t *testing.T) {
+		lowered := make([]string, len(adOrder))
+		for i, v := range adOrder {
+			lowered[i] = strings.ToLower(v)
+		}
+		assertEqual(t, orderLike(lowered, configOrder), configOrder)
+	})
+
+	t.Run("AD upper-cases everything returns config order", func(t *testing.T) {
+		upper := make([]string, len(adOrder))
+		for i, v := range adOrder {
+			upper[i] = strings.ToUpper(v)
+		}
+		assertEqual(t, orderLike(upper, configOrder), configOrder)
+	})
+
+	t.Run("one owner replaced in AD returns AD order", func(t *testing.T) {
+		changed := append([]string(nil), adOrder...)
+		changed[mixedIdx] = "MixedUsex@example.com"
+		assertEqual(t, orderLike(changed, configOrder), changed)
+	})
+
+	t.Run("one owner removed in AD returns AD order", func(t *testing.T) {
+		removed := append(append([]string(nil), adOrder[:mixedIdx]...), adOrder[mixedIdx+1:]...)
+		assertEqual(t, orderLike(removed, configOrder), removed)
+	})
+}
+
+func TestOrderLike_RandomShuffles(t *testing.T) {
+	const iterations = 500
+	rng := rand.New(rand.NewPCG(42, 1024))
+	configOrder, _ := largeOwnersFixture()
+
+	randomCase := func(s string) string {
+		switch rng.IntN(3) {
+		case 0:
+			return strings.ToLower(s)
+		case 1:
+			return strings.ToUpper(s)
+		default:
+			return s
+		}
+	}
+
+	for it := 0; it < iterations; it++ {
+		actual := make([]string, len(configOrder))
+		for i, v := range configOrder {
+			actual[i] = randomCase(v)
+		}
+		rng.Shuffle(len(actual), func(i, j int) { actual[i], actual[j] = actual[j], actual[i] })
+
+		if got := orderLike(actual, configOrder); !slices.Equal(got, configOrder) {
+			t.Fatalf("iteration %d: same set should return prior\nactual: %v\ngot:    %v", it, actual, got)
+		}
+
+		mutated := slices.Clone(actual)
+		mutated[rng.IntN(len(mutated))] = fmt.Sprintf("Intruder%03d@example.com", it)
+		if got := orderLike(mutated, configOrder); !slices.Equal(got, mutated) {
+			t.Fatalf("iteration %d: replaced value should return actual\nactual: %v\ngot:    %v", it, mutated, got)
+		}
+
+		idx := rng.IntN(len(actual))
+		shrunk := slices.Delete(slices.Clone(actual), idx, idx+1)
+		if got := orderLike(shrunk, configOrder); !slices.Equal(got, shrunk) {
+			t.Fatalf("iteration %d: removed value should return actual\nactual: %v\ngot:    %v", it, shrunk, got)
+		}
 	}
 }
 
